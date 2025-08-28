@@ -7,64 +7,78 @@ import (
 	"strings"
 )
 
+// go
+type Config struct {
+	Next     *string
+	Previous *string
+}
+
+type commandFn func(cfg *Config, args []string, registry map[string]cliCommand) error
+
 type cliCommand struct {
 	name        string
 	description string
-	callback    func() error
+	callback    commandFn
 }
 
 func main() {
-	var registry = map[string]cliCommand{
-		"exit": {
-			name:        "exit",
-			description: "Exit the Pokedex",
-			callback:    commandExit,
-		},
+	cfg := &Config{}
+
+	registry := map[string]cliCommand{
+		"exit": {name: "exit", description: "Exit the Pokedex", callback: commandExit},
 	}
 	registry["help"] = cliCommand{
-		name:        "help",
-		description: "Displays a help message",
-		callback: func() error {
-			return commandHelp(registry)
-		},
+		name: "help", description: "Displays a help message", callback: commandHelp,
 	}
 
-	//s := []string{}
+	registry["map"] = cliCommand{name: "map", description: "List next 20 location areas", callback: commandMap}
+	registry["mapb"] = cliCommand{name: "mapb", description: "List previous 20 location areas", callback: commandMapb}
+
 	scanner := bufio.NewScanner(os.Stdin)
-	var liner string
 	for {
 		fmt.Print("Pokedex > ")
-		scanner.Scan()
-		liner = scanner.Text()
-		s := cleanInput(liner)
-		if len(s) == 0 {
+		if !scanner.Scan() {
+			return
+		}
+		line := scanner.Text()
+		parts := cleanInput(line)
+		if len(parts) == 0 {
 			continue
 		}
-		command, exists := registry[s[0]]
-		if !exists {
+		cmdName := parts[0]
+		args := parts[1:]
+
+		cmd, ok := registry[cmdName]
+		if !ok {
 			fmt.Println("Unknown command")
-		} else {
-			err := command.callback()
-			if err != nil {
-				fmt.Println(err)
-			}
+			continue
 		}
 
+		if err := cmd.callback(cfg, args, registry); err != nil {
+			fmt.Println(err)
+		}
 	}
-
 }
 
-func commandExit() error {
+func commandExit(cfg *Config, args []string, registry map[string]cliCommand) error {
 	fmt.Println("Closing the Pokedex... Goodbye!")
 	os.Exit(0)
 	return nil
 }
 
-func commandHelp(commandRegistry map[string]cliCommand) error {
+func commandHelp(cfg *Config, args []string, registry map[string]cliCommand) error {
 	fmt.Printf("Welcome to the Pokedex!\nUsage:\n\n")
-	for key, value := range commandRegistry {
+	for key, value := range registry {
 		fmt.Printf("%s: %s\n", key, value.description)
 	}
+	return nil
+}
+
+func commandMap(cfg *Config, args []string, registry map[string]cliCommand) error {
+	return nil
+}
+
+func commandMapb(cfg *Config, args []string, registry map[string]cliCommand) error {
 	return nil
 }
 
