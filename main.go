@@ -1,17 +1,15 @@
 package main
 
 import (
+	"Pokedex/internal/pokeapi"
 	"bufio"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strings"
 )
-
-// go
-type Config struct {
-	Next     *string
-	Previous *string
-}
 
 type commandFn func(cfg *Config, args []string, registry map[string]cliCommand) error
 
@@ -19,6 +17,11 @@ type cliCommand struct {
 	name        string
 	description string
 	callback    commandFn
+}
+
+type Config struct {
+	Next     *string
+	Previous *string
 }
 
 func main() {
@@ -60,12 +63,6 @@ func main() {
 	}
 }
 
-func commandExit(cfg *Config, args []string, registry map[string]cliCommand) error {
-	fmt.Println("Closing the Pokedex... Goodbye!")
-	os.Exit(0)
-	return nil
-}
-
 func commandHelp(cfg *Config, args []string, registry map[string]cliCommand) error {
 	fmt.Printf("Welcome to the Pokedex!\nUsage:\n\n")
 	for key, value := range registry {
@@ -75,10 +72,83 @@ func commandHelp(cfg *Config, args []string, registry map[string]cliCommand) err
 }
 
 func commandMap(cfg *Config, args []string, registry map[string]cliCommand) error {
+	url := "https://pokeapi.co/api/v2/location-area"
+	if cfg.Next != nil || cfg.Previous != nil {
+		if cfg.Next != nil {
+			url = *cfg.Next
+		}
+	}
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status: %s", resp.Status)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	var data pokeapi.LocationAreaList
+
+	if err := json.Unmarshal(body, &data); err != nil {
+		return err
+	}
+
+	for _, r := range data.Results {
+		fmt.Println(r.Name)
+	}
+
+	cfg.Next = data.Next
+	cfg.Previous = data.Previous
 	return nil
+
 }
 
 func commandMapb(cfg *Config, args []string, registry map[string]cliCommand) error {
+	if cfg.Previous == nil {
+		fmt.Println("you're on the first page")
+		return nil
+	}
+
+	url := *cfg.Previous
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status: %s", resp.Status)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	var data pokeapi.LocationAreaList
+	if err := json.Unmarshal(body, &data); err != nil {
+		return err
+	}
+
+	for _, r := range data.Results {
+		fmt.Println(r.Name)
+	}
+
+	cfg.Next = data.Next
+	cfg.Previous = data.Previous
+	return nil
+
+}
+
+func commandExit(cfg *Config, args []string, registry map[string]cliCommand) error {
+	fmt.Println("Closing the Pokedex... Goodbye!")
+	os.Exit(0)
 	return nil
 }
 
