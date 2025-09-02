@@ -47,5 +47,5 @@ func (c *Client) GetLocationArea(ctx context.Context, name string) (LocationArea
 		return LocationArea{}, err
 	}
 	return area, nil
-	return LocationArea{}, nil
+
 }
